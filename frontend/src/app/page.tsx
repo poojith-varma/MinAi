@@ -11,11 +11,15 @@ export default function Home() {
     {
       role: "assistant",
       content:
-        "Welcome to MinAI.\n\nUpload files, research documents, and interact with your intelligent AI workspace.",
+        "Welcome to MinAI.\n\nUpload PDFs and chat with your documents using AI.",
     },
   ]);
 
-  const [loading, setLoading] = useState(false);
+const [loading, setLoading] = useState(false);
+
+const [uploading, setUploading] = useState(false);
+
+const [chatMode, setChatMode] = useState("pdf");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -27,6 +31,7 @@ export default function Home() {
 
   }, [messages, loading]);
 
+  // Send Normal Chat
   const sendMessage = async () => {
 
     if (!message.trim() || loading) return;
@@ -66,7 +71,106 @@ export default function Home() {
         ...prev,
         {
           role: "assistant",
-          content: "Something went wrong while contacting the AI server.",
+          content: "Failed to contact AI server.",
+        },
+      ]);
+
+    }
+
+    setLoading(false);
+  };
+
+  // Upload PDF
+  const uploadPDF = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const formData = new FormData();
+
+    formData.append("file", file);
+
+    setUploading(true);
+
+    try {
+
+      const response = await axios.post(
+        "http://127.0.0.1:8000/upload-pdf",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      setMessages((prev: any) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `PDF uploaded successfully.\nIndexed ${response.data.chunks} chunks.`,
+        },
+      ]);
+
+    } catch (error) {
+
+      setMessages((prev: any) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "PDF upload failed.",
+        },
+      ]);
+
+    }
+
+    setUploading(false);
+  };
+
+  // Ask PDF Questions
+  const askPDF = async () => {
+
+    if (!message.trim() || loading) return;
+
+    const userMessage = {
+      role: "user",
+      content: message,
+    };
+
+    setMessages((prev: any) => [...prev, userMessage]);
+
+    const currentMessage = message;
+
+    setMessage("");
+
+    setLoading(true);
+
+    try {
+
+      const response = await axios.post(
+        "http://127.0.0.1:8000/ask-pdf",
+        {
+          message: currentMessage,
+        }
+      );
+
+      const aiMessage = {
+        role: "assistant",
+        content: response.data.response,
+      };
+
+      setMessages((prev: any) => [...prev, aiMessage]);
+
+    } catch (error) {
+
+      setMessages((prev: any) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Failed to query PDF.",
         },
       ]);
 
@@ -81,10 +185,9 @@ export default function Home() {
       {/* Sidebar */}
       <aside className="w-72 border-r border-[#1A1A1A] bg-[#0D0D0D] flex flex-col">
 
-        {/* Logo */}
         <div className="p-6 border-b border-[#1A1A1A]">
 
-          <h1 className="text-3xl font-semibold tracking-tight text-white">
+          <h1 className="text-3xl font-semibold">
             MinAI
           </h1>
 
@@ -94,75 +197,77 @@ export default function Home() {
 
         </div>
 
-        {/* Workspace Button */}
-        <div className="p-4">
+        {/* Upload */}
+        <div className="p-4 space-y-3">
 
-          <button className="w-full bg-[#1A1A1A] hover:bg-[#222222] transition-all border border-[#2A2A2A] rounded-2xl py-3 text-sm font-medium">
-            + New Workspace
-          </button>
+          <label className="block">
+
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={uploadPDF}
+            />
+
+            <div className="w-full bg-[#1A1A1A] hover:bg-[#222222] border border-[#2A2A2A] rounded-2xl py-3 text-sm font-medium text-center cursor-pointer transition-all">
+
+              {uploading
+                ? "Uploading PDF..."
+                : "Upload PDF"}
+
+            </div>
+
+          </label>
 
         </div>
 
-        {/* Workspace List */}
+        {/* Workspace Cards */}
         <div className="flex-1 overflow-y-auto px-4 space-y-3">
 
-          <div className="bg-[#111111] border border-[#1F1F1F] hover:border-[#333333] transition-all rounded-2xl p-4 cursor-pointer">
+          <div className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4">
 
             <h3 className="font-medium text-sm">
-              DBMS Research
+              PDF RAG System
             </h3>
 
             <p className="text-xs text-gray-500 mt-2">
-              2 PDFs uploaded
+              Semantic document intelligence
             </p>
 
           </div>
 
-          <div className="bg-[#111111] border border-[#1F1F1F] hover:border-[#333333] transition-all rounded-2xl p-4 cursor-pointer">
+          <div className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4">
 
             <h3 className="font-medium text-sm">
-              Resume Review
+              AI Workspace
             </h3>
 
             <p className="text-xs text-gray-500 mt-2">
-              AI suggestions generated
-            </p>
-
-          </div>
-
-          <div className="bg-[#111111] border border-[#1F1F1F] hover:border-[#333333] transition-all rounded-2xl p-4 cursor-pointer">
-
-            <h3 className="font-medium text-sm">
-              AI Notes
-            </h3>
-
-            <p className="text-xs text-gray-500 mt-2">
-              Study material workspace
+              Chat with uploaded files
             </p>
 
           </div>
 
         </div>
 
-        {/* Bottom */}
         <div className="p-4 border-t border-[#1A1A1A] text-xs text-gray-600">
           MinAI v1.0
         </div>
 
       </aside>
 
-      {/* Main Section */}
+      {/* Main */}
       <section className="flex-1 flex flex-col">
 
         {/* Navbar */}
-        <div className="h-16 border-b border-[#1A1A1A] bg-[#0D0D0D]/80 backdrop-blur-xl flex items-center justify-between px-6">
+        <div className="h-16 border-b border-[#1A1A1A] bg-[#0D0D0D] flex items-center justify-between px-6">
 
-          <h2 className="text-sm font-medium tracking-wide text-gray-300">
-            AI Workspace
+          <h2 className="text-sm text-gray-400">
+            AI Document Workspace
           </h2>
 
-          <div className="text-xs text-gray-500">
-            Powered by AI
+          <div className="text-xs text-gray-600">
+            RAG Enabled
           </div>
 
         </div>
@@ -207,7 +312,6 @@ export default function Home() {
 
                 <p className="text-gray-400 animate-pulse">
                   MinAI is analyzing your request...
-This may take a few seconds.
                 </p>
 
               </div>
@@ -220,29 +324,35 @@ This may take a few seconds.
 
         </div>
 
-        {/* Prompt Suggestions */}
-        <div className="px-8 pb-4 flex gap-3 overflow-x-auto">
+        {/* Chat Mode Toggle */}
+<div className="px-8 pb-4 flex gap-3">
 
-          <button className="bg-[#111111] border border-[#1F1F1F] hover:border-[#333333] transition-all px-4 py-2 rounded-2xl text-sm whitespace-nowrap">
-            Summarize Document
-          </button>
+  <button
+    onClick={() => setChatMode("pdf")}
+    className={`px-5 py-2 rounded-2xl text-sm transition-all ${
+      chatMode === "pdf"
+        ? "bg-[#F5F5F5] text-black"
+        : "bg-[#111111] border border-[#1F1F1F]"
+    }`}
+  >
+    PDF Chat
+  </button>
 
-          <button className="bg-[#111111] border border-[#1F1F1F] hover:border-[#333333] transition-all px-4 py-2 rounded-2xl text-sm whitespace-nowrap">
-            Explain Simply
-          </button>
+  <button
+    onClick={() => setChatMode("normal")}
+    className={`px-5 py-2 rounded-2xl text-sm transition-all ${
+      chatMode === "normal"
+        ? "bg-[#F5F5F5] text-black"
+        : "bg-[#111111] border border-[#1F1F1F]"
+    }`}
+  >
+    Normal Chat
+  </button>
 
-          <button className="bg-[#111111] border border-[#1F1F1F] hover:border-[#333333] transition-all px-4 py-2 rounded-2xl text-sm whitespace-nowrap">
-            Extract Key Points
-          </button>
+</div>
 
-          <button className="bg-[#111111] border border-[#1F1F1F] hover:border-[#333333] transition-all px-4 py-2 rounded-2xl text-sm whitespace-nowrap">
-            Generate Report
-          </button>
-
-        </div>
-
-        {/* Input Area */}
-        <div className="border-t border-[#1A1A1A] bg-[#0D0D0D]/80 backdrop-blur-xl p-6">
+        {/* Input */}
+        <div className="border-t border-[#1A1A1A] bg-[#0D0D0D] p-6">
 
           <div className="flex items-center gap-4">
 
@@ -251,20 +361,44 @@ This may take a few seconds.
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  sendMessage();
-                }
-              }}
-              placeholder="Ask anything..."
-              className="flex-1 bg-[#111111] border border-[#1F1F1F] focus:border-[#3A3A3A] transition-all rounded-3xl px-6 py-4 outline-none text-white placeholder:text-gray-500"
+
+  if (e.key === "Enter") {
+
+    if (chatMode === "pdf") {
+      askPDF();
+    } else {
+      sendMessage();
+    }
+
+  }
+
+}}
+              placeholder="Ask questions about uploaded PDFs..."
+              className="flex-1 bg-[#111111] border border-[#1F1F1F] focus:border-[#333333] rounded-3xl px-6 py-4 outline-none text-white placeholder:text-gray-500"
             />
+
+            <button
+  onClick={() => {
+    if (chatMode === "pdf") {
+      askPDF();
+    } else {
+      sendMessage();
+    }
+  }}
+              disabled={loading}
+              className="bg-[#F5F5F5] text-black hover:opacity-90 transition-all px-8 py-4 rounded-3xl font-medium disabled:opacity-50"
+            >
+              {chatMode === "pdf"
+  ? "Ask PDF"
+  : "Send"}
+            </button>
 
             <button
               onClick={sendMessage}
               disabled={loading}
-              className="bg-[#F5F5F5] text-black hover:opacity-90 transition-all px-8 py-4 rounded-3xl font-medium disabled:opacity-50"
+              className="bg-[#1F1F1F] border border-[#333333] hover:bg-[#2A2A2A] transition-all px-8 py-4 rounded-3xl font-medium"
             >
-              Send
+              Normal Chat
             </button>
 
           </div>
