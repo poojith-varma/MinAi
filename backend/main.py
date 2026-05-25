@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from openai import OpenAI
+from groq import Groq
 from dotenv import load_dotenv
 import os
 
@@ -11,7 +11,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
-# Load environment variables
+# Load Environment Variables
 load_dotenv()
 
 # FastAPI App
@@ -31,11 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# OpenRouter Client
-client = OpenAI(
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-    base_url="https://openrouter.ai/api/v1",
-    timeout=60,
+# Client
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
 )
 
 # Request Model
@@ -50,49 +48,92 @@ async def root():
         "message": "MinAI backend is running"
     }
 
-# Normal AI Chat Endpoint
+# -----------------------------------------
+# MODEL FALLBACK FUNCTION
+# -----------------------------------------
+def generate_ai_response(messages):
+
+    models = [
+    "llama-3.3-70b-versatile",
+    "llama3-8b-8192"
+]
+
+    for model_name in models:
+
+        try:
+
+            print(f"\nTrying model: {model_name}")
+
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=700
+            )
+
+            response_text = (
+                completion.choices[0]
+                .message
+                .content
+            )
+
+            if (
+                response_text is not None
+                and response_text.strip() != ""
+            ):
+
+                print(f"\nSUCCESS: {model_name}")
+
+                return response_text
+
+        except Exception as e:
+
+            print(f"\nFAILED: {model_name}")
+            print(str(e))
+
+    return None
+
+# -----------------------------------------
+# NORMAL CHAT
+# -----------------------------------------
 @app.post("/chat")
 async def chat(req: ChatRequest):
 
     try:
 
-        completion = client.chat.completions.create(
-            model="meta-llama/llama-3.3-70b-instruct:free",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
+        messages = [
+            {
+                "role": "system",
+                "content": """
 You are MinAI, a futuristic AI workspace assistant.
 
-Your responsibilities:
-- Help users research topics
-- Summarize information
-- Explain concepts clearly
-- Assist with document analysis
-- Maintain concise and professional responses
+Responsibilities:
+- Answer questions clearly
+- Explain concepts professionally
+- Maintain concise and helpful responses
 
 IMPORTANT:
-- ALWAYS respond entirely in English
+- ALWAYS respond in English
 - NEVER switch languages
-- Keep responses clean and readable
 """
-                },
-                {
-                    "role": "user",
-                    "content": req.message
-                }
-            ]
-        )
+            },
+            {
+                "role": "user",
+                "content": req.message
+            }
+        ]
 
-        response_text = completion.choices[0].message.content
+        response_text = generate_ai_response(messages)
 
-        if response_text is None or response_text.strip() == "":
+        if (
+            response_text is None
+            or response_text.strip() == ""
+        ):
+
             response_text = """
-I could not generate a complete response.
+All free AI models are currently busy.
 
-Try:
-- asking more specifically
-- rephrasing the question
+Please try again in a few seconds.
 """
 
         return {
@@ -101,17 +142,24 @@ Try:
 
     except Exception as e:
 
+        print("\n========== CHAT ERROR ==========")
+        print(str(e))
+        print("================================\n")
+
         return {
             "error": str(e)
         }
 
-# PDF Upload Endpoint
+# -----------------------------------------
+# PDF UPLOAD
+# -----------------------------------------
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
 
     try:
 
-        # Save uploaded file
+        os.makedirs("uploads", exist_ok=True)
+
         file_path = f"uploads/{file.filename}"
 
         with open(file_path, "wb") as f:
@@ -119,113 +167,162 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         # Load PDF
         loader = PyPDFLoader(file_path)
+
         documents = loader.load()
 
-        # Better Chunking
+        # Split Documents
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,
-            chunk_overlap=300
+            chunk_size=1200,
+            chunk_overlap=200
         )
 
         docs = splitter.split_documents(documents)
 
-        # Create Vector Database
+        # Store Embeddings
         vectorstore = Chroma.from_documents(
             docs,
             embedding_model,
             persist_directory="chroma_db"
         )
 
+        print("\n========== PDF INDEXED ==========")
+        print(f"Chunks Created: {len(docs)}")
+        print("=================================\n")
+
         return {
-            "message": "PDF uploaded and indexed successfully",
+            "message": "PDF uploaded successfully",
             "chunks": len(docs),
             "filename": file.filename
         }
 
     except Exception as e:
 
+        print("\n========== PDF ERROR ==========")
+        print(str(e))
+        print("================================\n")
+
         return {
             "error": str(e)
         }
 
-# Ask Questions About Uploaded PDFs (RAG)
+# -----------------------------------------
+# PDF RAG CHAT
+# -----------------------------------------
 @app.post("/ask-pdf")
 async def ask_pdf(req: ChatRequest):
 
     try:
 
-        # Load Vector Database
+        # Load Vector DB
         vectorstore = Chroma(
             persist_directory="chroma_db",
             embedding_function=embedding_model
         )
 
-        # Better Semantic Retrieval
+        # Retrieve Relevant Chunks
         docs = vectorstore.similarity_search(
-            f"Educational explanation about: {req.message}",
-            k=6
+            req.message,
+            k=3
         )
 
-        # Combine Retrieved Chunks
-        context = "\n\n".join(
-            [doc.page_content for doc in docs]
-        )
+        context_parts = []
 
-        # Generate AI Response
-        completion = client.chat.completions.create(
-            model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"""
-You are MinAI, an advanced AI research assistant.
+        sources = []
 
-Your responsibilities:
-- Understand uploaded documents deeply
-- Answer direct and conceptual questions
-- Explain topics clearly and professionally
-- Use document context intelligently
-- Provide educational answers
+        for doc in docs:
 
-IMPORTANT RULES:
-- ALWAYS respond entirely in English
-- NEVER switch languages
-- Use the document context as primary knowledge
-- You may use general knowledge to improve explanations
-- If the question relates to the document topic, answer intelligently
-- Give detailed but concise responses
-- Maintain professional formatting
-- Explain concepts in a student-friendly way
+            text = doc.page_content.strip()
+
+            if len(text) > 40:
+                context_parts.append(text)
+
+            page = doc.metadata.get("page", "Unknown")
+
+            if page != "Unknown":
+                page = page + 1
+
+            sources.append(f"Page {page}")
+
+        # Remove duplicate pages
+        sources = list(set(sources))
+
+        context = "\n\n".join(context_parts)
+
+        print("\n========== RETRIEVED CONTEXT ==========")
+        print(context[:1200])
+        print("=======================================\n")
+
+        # Empty Context
+        if context.strip() == "":
+
+            return {
+                "response": """
+I could not find relevant information in the uploaded PDF.
+""",
+                "sources": []
+            }
+
+        # AI Messages
+        messages = [
+            {
+                "role": "system",
+                "content": """
+You are MinAI, an intelligent educational AI assistant.
+
+Rules:
+- ALWAYS answer in English
+- Explain concepts clearly
+- Be concise but informative
+- Use simple educational language
+- Answer using the provided document context
+"""
+            },
+            {
+                "role": "user",
+                "content": f"""
+Question:
+{req.message}
 
 Document Context:
 {context}
+
+Answer:
 """
-                },
-                {
-                    "role": "user",
-                    "content": req.message
-                }
-            ]
-        )
+            }
+        ]
 
-        response_text = completion.choices[0].message.content
+        # Generate Response
+        response_text = generate_ai_response(messages)
 
-        if response_text is None or response_text.strip() == "":
-            response_text = """
-I could not generate a complete response.
+        # Fallback Response
+        if (
+            response_text is None
+            or response_text.strip() == ""
+        ):
 
-Try:
-- asking more specifically
-- uploading a clearer document
-- rephrasing the question
+            response_text = f"""
+I found relevant information in the document but all free AI models are currently busy.
+
+Relevant Sources:
+{", ".join(sources)}
+
+Please try again in a few seconds.
 """
+
+        print("\n========== FINAL RESPONSE ==========")
+        print(response_text)
+        print("====================================\n")
 
         return {
             "response": response_text,
-            "context_chunks": len(docs)
+            "sources": sources
         }
 
     except Exception as e:
+
+        print("\n========== RAG ERROR ==========")
+        print(str(e))
+        print("================================\n")
 
         return {
             "error": str(e)

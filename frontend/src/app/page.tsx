@@ -7,7 +7,7 @@ export default function Home() {
 
   const [message, setMessage] = useState("");
 
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<any[]>([
     {
       role: "assistant",
       content:
@@ -15,11 +15,11 @@ export default function Home() {
     },
   ]);
 
-const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-const [chatMode, setChatMode] = useState("pdf");
+  const [chatMode, setChatMode] = useState("pdf");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -31,7 +31,7 @@ const [chatMode, setChatMode] = useState("pdf");
 
   }, [messages, loading]);
 
-  // Send Normal Chat
+  // Normal Chat
   const sendMessage = async () => {
 
     if (!message.trim() || loading) return;
@@ -41,7 +41,7 @@ const [chatMode, setChatMode] = useState("pdf");
       content: message,
     };
 
-    setMessages((prev: any) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
 
     const currentMessage = message;
 
@@ -63,11 +63,11 @@ const [chatMode, setChatMode] = useState("pdf");
         content: response.data.response,
       };
 
-      setMessages((prev: any) => [...prev, aiMessage]);
+      setMessages((prev) => [...prev, aiMessage]);
 
-    } catch (error) {
+    } catch {
 
-      setMessages((prev: any) => [
+      setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
@@ -107,20 +107,20 @@ const [chatMode, setChatMode] = useState("pdf");
         }
       );
 
-      setMessages((prev: any) => [
+      setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `📄 ${file.name}
-
-PDF uploaded successfully.
-Indexed ${response.data.chunks} semantic chunks.`,
+          type: "file",
+          fileName: file.name,
+          chunks: response.data.chunks,
+          content: "PDF uploaded successfully.",
         },
       ]);
 
-    } catch (error) {
+    } catch {
 
-      setMessages((prev: any) => [
+      setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
@@ -133,7 +133,7 @@ Indexed ${response.data.chunks} semantic chunks.`,
     setUploading(false);
   };
 
-  // Ask PDF Questions
+  // Ask PDF
   const askPDF = async () => {
 
     if (!message.trim() || loading) return;
@@ -143,7 +143,7 @@ Indexed ${response.data.chunks} semantic chunks.`,
       content: message,
     };
 
-    setMessages((prev: any) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
 
     const currentMessage = message;
 
@@ -162,14 +162,18 @@ Indexed ${response.data.chunks} semantic chunks.`,
 
       const aiMessage = {
         role: "assistant",
-        content: response.data.response,
+        content:
+    response.data.response ||
+    "No response generated.",
+  sources:
+    response.data.sources || [],
       };
 
-      setMessages((prev: any) => [...prev, aiMessage]);
+      setMessages((prev) => [...prev, aiMessage]);
 
-    } catch (error) {
+    } catch {
 
-      setMessages((prev: any) => [
+      setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
@@ -203,7 +207,7 @@ Indexed ${response.data.chunks} semantic chunks.`,
         {/* Upload */}
         <div className="p-4 space-y-3">
 
-          <label className="block">
+          <label className="block cursor-pointer">
 
             <input
               type="file"
@@ -212,7 +216,7 @@ Indexed ${response.data.chunks} semantic chunks.`,
               onChange={uploadPDF}
             />
 
-            <div className="w-full bg-[#1A1A1A] hover:bg-[#222222] border border-[#2A2A2A] rounded-2xl py-3 text-sm font-medium text-center cursor-pointer transition-all">
+            <div className="w-full bg-[#1A1A1A] hover:bg-[#222222] border border-[#2A2A2A] rounded-2xl py-3 text-sm font-medium text-center transition-all">
 
               {uploading
                 ? "Uploading PDF..."
@@ -224,7 +228,7 @@ Indexed ${response.data.chunks} semantic chunks.`,
 
         </div>
 
-        {/* Workspace Cards */}
+        {/* Sidebar Cards */}
         <div className="flex-1 overflow-y-auto px-4 space-y-3">
 
           <div className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4">
@@ -278,7 +282,7 @@ Indexed ${response.data.chunks} semantic chunks.`,
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6">
 
-          {messages.map((msg: any, index) => (
+          {messages.map((msg, index) => (
 
             <div
               key={index}
@@ -297,9 +301,58 @@ Indexed ${response.data.chunks} semantic chunks.`,
                 }`}
               >
 
-                <p className="leading-8 whitespace-pre-wrap text-[15px]">
-                  {msg.content}
-                </p>
+                {msg.type === "file" ? (
+
+                  <div className="flex items-center gap-4">
+
+                    <div className="w-14 h-14 rounded-2xl bg-[#1F1F1F] flex items-center justify-center text-2xl">
+                      📄
+                    </div>
+
+                    <div>
+
+                      <h3 className="font-medium text-white">
+                        {msg.fileName}
+                      </h3>
+
+                      <p className="text-sm text-gray-400 mt-1">
+                        Indexed {msg.chunks} semantic chunks
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                ) : (
+
+                  <div>
+
+                    <p className="leading-8 whitespace-pre-wrap text-[15px]">
+                      {msg.content || "No response available."}
+                    </p>
+
+                    {msg.sources && msg.sources.length > 0 && (
+
+                      <div className="mt-5 flex flex-wrap gap-2">
+
+                        {msg.sources.map((source: string, i: number) => (
+
+                          <div
+                            key={i}
+                            className="bg-[#1A1A1A] border border-[#2A2A2A] px-3 py-1 rounded-xl text-xs text-gray-300"
+                          >
+                            {source}
+                          </div>
+
+                        ))}
+
+                      </div>
+
+                    )}
+
+                  </div>
+
+                )}
 
               </div>
 
@@ -328,31 +381,31 @@ Indexed ${response.data.chunks} semantic chunks.`,
         </div>
 
         {/* Chat Mode Toggle */}
-<div className="px-8 pb-4 flex gap-3">
+        <div className="px-8 pb-4 flex gap-3">
 
-  <button
-    onClick={() => setChatMode("pdf")}
-    className={`px-5 py-2 rounded-2xl text-sm transition-all ${
-      chatMode === "pdf"
-        ? "bg-[#F5F5F5] text-black"
-        : "bg-[#111111] border border-[#1F1F1F]"
-    }`}
-  >
-    PDF Chat
-  </button>
+          <button
+            onClick={() => setChatMode("pdf")}
+            className={`px-5 py-2 rounded-2xl text-sm transition-all ${
+              chatMode === "pdf"
+                ? "bg-[#F5F5F5] text-black"
+                : "bg-[#111111] border border-[#1F1F1F]"
+            }`}
+          >
+            PDF Chat
+          </button>
 
-  <button
-    onClick={() => setChatMode("normal")}
-    className={`px-5 py-2 rounded-2xl text-sm transition-all ${
-      chatMode === "normal"
-        ? "bg-[#F5F5F5] text-black"
-        : "bg-[#111111] border border-[#1F1F1F]"
-    }`}
-  >
-    Normal Chat
-  </button>
+          <button
+            onClick={() => setChatMode("normal")}
+            className={`px-5 py-2 rounded-2xl text-sm transition-all ${
+              chatMode === "normal"
+                ? "bg-[#F5F5F5] text-black"
+                : "bg-[#111111] border border-[#1F1F1F]"
+            }`}
+          >
+            Normal Chat
+          </button>
 
-</div>
+        </div>
 
         {/* Input */}
         <div className="border-t border-[#1A1A1A] bg-[#0D0D0D] p-6">
@@ -365,43 +418,39 @@ Indexed ${response.data.chunks} semantic chunks.`,
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => {
 
-  if (e.key === "Enter") {
+                if (e.key === "Enter") {
 
-    if (chatMode === "pdf") {
-      askPDF();
-    } else {
-      sendMessage();
-    }
+                  if (chatMode === "pdf") {
+                    askPDF();
+                  } else {
+                    sendMessage();
+                  }
 
-  }
+                }
 
-}}
-              placeholder="Ask questions about uploaded PDFs..."
+              }}
+              placeholder={
+                chatMode === "pdf"
+                  ? "Ask questions about uploaded PDFs..."
+                  : "Ask MinAI anything..."
+              }
               className="flex-1 bg-[#111111] border border-[#1F1F1F] focus:border-[#333333] rounded-3xl px-6 py-4 outline-none text-white placeholder:text-gray-500"
             />
 
             <button
-  onClick={() => {
-    if (chatMode === "pdf") {
-      askPDF();
-    } else {
-      sendMessage();
-    }
-  }}
+              onClick={() => {
+                if (chatMode === "pdf") {
+                  askPDF();
+                } else {
+                  sendMessage();
+                }
+              }}
               disabled={loading}
               className="bg-[#F5F5F5] text-black hover:opacity-90 transition-all px-8 py-4 rounded-3xl font-medium disabled:opacity-50"
             >
               {chatMode === "pdf"
-  ? "Ask PDF"
-  : "Send"}
-            </button>
-
-            <button
-              onClick={sendMessage}
-              disabled={loading}
-              className="bg-[#1F1F1F] border border-[#333333] hover:bg-[#2A2A2A] transition-all px-8 py-4 rounded-3xl font-medium"
-            >
-              Normal Chat
+                ? "Ask PDF"
+                : "Send"}
             </button>
 
           </div>
