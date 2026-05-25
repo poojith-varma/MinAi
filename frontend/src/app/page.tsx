@@ -130,14 +130,53 @@ export default function Home() {
   // -----------------------------------------
   // AUTO SCROLL
   // -----------------------------------------
-  useEffect(() => {
+//
+// LOAD SAVED DATA
+//
+useEffect(() => {
 
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
+  const savedMessages =
+    localStorage.getItem("minai_messages");
 
-  }, [messages, loading]);
+  const savedFiles =
+    localStorage.getItem("minai_uploaded_files");
 
+  if (savedMessages) {
+
+    setMessages(JSON.parse(savedMessages));
+
+  }
+
+  if (savedFiles) {
+
+    setUploadedFiles(JSON.parse(savedFiles));
+
+  }
+
+}, []);
+
+//
+// AUTO SCROLL + SAVE DATA
+//
+useEffect(() => {
+
+  messagesEndRef.current?.scrollIntoView({
+    behavior: "smooth",
+  });
+
+  // Save Messages
+  localStorage.setItem(
+    "minai_messages",
+    JSON.stringify(messages)
+  );
+
+  // Save Uploaded Files
+  localStorage.setItem(
+    "minai_uploaded_files",
+    JSON.stringify(uploadedFiles)
+  );
+
+}, [messages, loading, uploadedFiles]);
   // -----------------------------------------
   // NORMAL CHAT
   // -----------------------------------------
@@ -470,9 +509,38 @@ export default function Home() {
             AI Document Workspace
           </h2>
 
-          <div className="text-xs text-gray-600">
-            Multi-Document RAG Enabled
-          </div>
+          <div className="flex items-center gap-3">
+
+  <div className="text-xs text-gray-600">
+    Multi-Document RAG Enabled
+  </div>
+
+  <button
+    onClick={() => {
+
+      localStorage.removeItem("minai_messages");
+
+      localStorage.removeItem(
+        "minai_uploaded_files"
+      );
+
+      setMessages([
+        {
+          role: "assistant",
+          content:
+            "# Welcome to MinAI 🚀\n\nUpload PDFs and chat with your documents using AI.",
+        },
+      ]);
+
+      setUploadedFiles([]);
+
+    }}
+    className="text-xs bg-[#111111] border border-[#1F1F1F] hover:bg-[#1A1A1A] px-3 py-1 rounded-xl transition-all"
+  >
+    Clear Chat
+  </button>
+
+</div>
 
         </div>
 
