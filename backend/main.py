@@ -17,12 +17,18 @@ load_dotenv()
 # FastAPI App
 app = FastAPI()
 
-# Embedding Model
-embedding_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+# -----------------------------------------
+# LIGHTWEIGHT EMBEDDING LOADER
+# -----------------------------------------
+def get_embedding_model():
 
-# Enable CORS
+    return HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+
+# -----------------------------------------
+# ENABLE CORS
+# -----------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,16 +37,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Client
+# -----------------------------------------
+# GROQ CLIENT
+# -----------------------------------------
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-# Request Model
+# -----------------------------------------
+# REQUEST MODEL
+# -----------------------------------------
 class ChatRequest(BaseModel):
     message: str
 
-# Root Route
+# -----------------------------------------
+# ROOT ROUTE
+# -----------------------------------------
 @app.get("/")
 async def root():
 
@@ -49,14 +61,14 @@ async def root():
     }
 
 # -----------------------------------------
-# MODEL FALLBACK FUNCTION
+# AI RESPONSE GENERATOR
 # -----------------------------------------
 def generate_ai_response(messages):
 
     models = [
-    "llama-3.3-70b-versatile",
-    "llama3-8b-8192"
-]
+        "llama-3.3-70b-versatile",
+        "llama3-8b-8192"
+    ]
 
     for model_name in models:
 
@@ -131,7 +143,7 @@ IMPORTANT:
         ):
 
             response_text = """
-All free AI models are currently busy.
+All AI models are currently busy.
 
 Please try again in a few seconds.
 """
@@ -178,12 +190,13 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         docs = splitter.split_documents(documents)
 
-        # Store Embeddings
+        # Create Vector DB
         vectorstore = Chroma(
-    persist_directory="chroma_db",
-    embedding_function=embedding_model
-    )
+            persist_directory="chroma_db",
+            embedding_function=get_embedding_model()
+        )
 
+        # Add Documents
         vectorstore.add_documents(docs)
 
         print("\n========== PDF INDEXED ==========")
@@ -214,13 +227,13 @@ async def ask_pdf(req: ChatRequest):
 
     try:
 
-        # Load Vector DB
+        # Load Existing Vector DB
         vectorstore = Chroma(
             persist_directory="chroma_db",
-            embedding_function=embedding_model
+            embedding_function=get_embedding_model()
         )
 
-        # Retrieve Relevant Chunks
+        # Semantic Search
         docs = vectorstore.similarity_search(
             req.message,
             k=3
@@ -244,7 +257,7 @@ async def ask_pdf(req: ChatRequest):
 
             sources.append(f"Page {page}")
 
-        # Remove duplicate pages
+        # Remove duplicates
         sources = list(set(sources))
 
         context = "\n\n".join(context_parts)
@@ -253,7 +266,7 @@ async def ask_pdf(req: ChatRequest):
         print(context[:1200])
         print("=======================================\n")
 
-        # Empty Context
+        # No Context
         if context.strip() == "":
 
             return {
@@ -263,7 +276,7 @@ I could not find relevant information in the uploaded PDF.
                 "sources": []
             }
 
-        # AI Messages
+        # AI Prompt
         messages = [
             {
                 "role": "system",
@@ -292,17 +305,17 @@ Answer:
             }
         ]
 
-        # Generate Response
+        # Generate AI Response
         response_text = generate_ai_response(messages)
 
-        # Fallback Response
+        # Fallback
         if (
             response_text is None
             or response_text.strip() == ""
         ):
 
             response_text = f"""
-I found relevant information in the document but all free AI models are currently busy.
+I found relevant information in the document but the AI models are currently busy.
 
 Relevant Sources:
 {", ".join(sources)}
