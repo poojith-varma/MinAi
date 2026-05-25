@@ -179,11 +179,12 @@ async def upload_pdf(file: UploadFile = File(...)):
         docs = splitter.split_documents(documents)
 
         # Store Embeddings
-        vectorstore = Chroma.from_documents(
-            docs,
-            embedding_model,
-            persist_directory="chroma_db"
-        )
+        vectorstore = Chroma(
+    persist_directory="chroma_db",
+    embedding_function=embedding_model
+    )
+
+        vectorstore.add_documents(docs)
 
         print("\n========== PDF INDEXED ==========")
         print(f"Chunks Created: {len(docs)}")

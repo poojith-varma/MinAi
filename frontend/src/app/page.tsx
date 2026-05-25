@@ -351,10 +351,10 @@ useEffect(() => {
   };
 
   return (
-    <main className="flex h-screen bg-[#0A0A0A] text-white overflow-hidden">
+    <main className="flex flex-col md:flex-row h-screen bg-[#0A0A0A] text-white overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="w-80 border-r border-[#1A1A1A] bg-[#0D0D0D] flex flex-col">
+      <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-[#1A1A1A] bg-[#0D0D0D] flex flex-col max-h-[320px] md:max-h-full overflow-y-auto">
 
         {/* Logo */}
         <div className="p-6 border-b border-[#1A1A1A]">
@@ -500,7 +500,7 @@ useEffect(() => {
       </aside>
 
       {/* Main */}
-      <section className="flex-1 flex flex-col">
+      <section className="flex-1 flex flex-col min-h-0">
 
         {/* Navbar */}
         <div className="h-16 border-b border-[#1A1A1A] bg-[#0D0D0D] flex items-center justify-between px-6">
@@ -545,7 +545,7 @@ useEffect(() => {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
 
           {messages.map((msg, index) => (
 
@@ -700,7 +700,7 @@ useEffect(() => {
         </div>
 
         {/* Mode Toggle */}
-        <div className="px-8 pb-4 flex gap-3">
+        <div className="px-4 md:px-8 pb-4 flex flex-wrap gap-3">
 
           <button
             onClick={() => setChatMode("pdf")}
@@ -729,7 +729,7 @@ useEffect(() => {
         {/* Input */}
         <div className="border-t border-[#1A1A1A] bg-[#0D0D0D] p-6">
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
 
             <input
               type="text"
@@ -767,8 +767,7 @@ useEffect(() => {
 
               }}
               disabled={loading}
-              className="bg-[#F5F5F5] text-black hover:opacity-90 transition-all px-8 py-4 rounded-3xl font-medium disabled:opacity-50"
-            >
+              className="bg-[#F5F5F5] text-black hover:opacity-90 transition-all px-8 py-4 rounded-3xl font-medium disabled:opacity-50 w-full md:w-auto"            >
               {chatMode === "pdf"
                 ? "Ask PDF"
                 : "Send"}
