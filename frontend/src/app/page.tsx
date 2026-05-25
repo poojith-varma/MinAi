@@ -111,7 +111,10 @@ const [chatMode, setChatMode] = useState("pdf");
         ...prev,
         {
           role: "assistant",
-          content: `PDF uploaded successfully.\nIndexed ${response.data.chunks} chunks.`,
+          content: `📄 ${file.name}
+
+PDF uploaded successfully.
+Indexed ${response.data.chunks} semantic chunks.`,
         },
       ]);
 

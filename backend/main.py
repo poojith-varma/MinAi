@@ -57,7 +57,7 @@ async def chat(req: ChatRequest):
     try:
 
         completion = client.chat.completions.create(
-            model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            model="meta-llama/llama-3.3-70b-instruct:free",
             messages=[
                 {
                     "role": "system",
@@ -70,6 +70,11 @@ Your responsibilities:
 - Explain concepts clearly
 - Assist with document analysis
 - Maintain concise and professional responses
+
+IMPORTANT:
+- ALWAYS respond entirely in English
+- NEVER switch languages
+- Keep responses clean and readable
 """
                 },
                 {
@@ -81,8 +86,14 @@ Your responsibilities:
 
         response_text = completion.choices[0].message.content
 
-        if response_text is None:
-            response_text = "The AI model returned an empty response."
+        if response_text is None or response_text.strip() == "":
+            response_text = """
+I could not generate a complete response.
+
+Try:
+- asking more specifically
+- rephrasing the question
+"""
 
         return {
             "response": response_text
@@ -110,10 +121,10 @@ async def upload_pdf(file: UploadFile = File(...)):
         loader = PyPDFLoader(file_path)
         documents = loader.load()
 
-        # Split text into chunks
+        # Better Chunking
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
+            chunk_size=1500,
+            chunk_overlap=300
         )
 
         docs = splitter.split_documents(documents)
@@ -127,7 +138,8 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         return {
             "message": "PDF uploaded and indexed successfully",
-            "chunks": len(docs)
+            "chunks": len(docs),
+            "filename": file.filename
         }
 
     except Exception as e:
@@ -148,10 +160,10 @@ async def ask_pdf(req: ChatRequest):
             embedding_function=embedding_model
         )
 
-        # Semantic Search
+        # Better Semantic Retrieval
         docs = vectorstore.similarity_search(
-            req.message,
-            k=4
+            f"Educational explanation about: {req.message}",
+            k=6
         )
 
         # Combine Retrieved Chunks
@@ -166,12 +178,24 @@ async def ask_pdf(req: ChatRequest):
                 {
                     "role": "system",
                     "content": f"""
-You are MinAI, an intelligent document assistant.
+You are MinAI, an advanced AI research assistant.
 
-Use the provided document context to answer the user's question clearly and accurately.
+Your responsibilities:
+- Understand uploaded documents deeply
+- Answer direct and conceptual questions
+- Explain topics clearly and professionally
+- Use document context intelligently
+- Provide educational answers
 
-If the answer is not available in the document, say:
-"I could not find that information in the uploaded document."
+IMPORTANT RULES:
+- ALWAYS respond entirely in English
+- NEVER switch languages
+- Use the document context as primary knowledge
+- You may use general knowledge to improve explanations
+- If the question relates to the document topic, answer intelligently
+- Give detailed but concise responses
+- Maintain professional formatting
+- Explain concepts in a student-friendly way
 
 Document Context:
 {context}
@@ -186,8 +210,15 @@ Document Context:
 
         response_text = completion.choices[0].message.content
 
-        if response_text is None:
-            response_text = "The AI model returned an empty response."
+        if response_text is None or response_text.strip() == "":
+            response_text = """
+I could not generate a complete response.
+
+Try:
+- asking more specifically
+- uploading a clearer document
+- rephrasing the question
+"""
 
         return {
             "response": response_text,
