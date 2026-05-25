@@ -3,6 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+import { useDropzone } from "react-dropzone";
+
 export default function Home() {
 
   const [message, setMessage] = useState("");
@@ -11,7 +16,7 @@ export default function Home() {
     {
       role: "assistant",
       content:
-        "Welcome to MinAI.\n\nUpload PDFs and chat with your documents using AI.",
+        "# Welcome to MinAI 🚀\n\nUpload PDFs and chat with your documents using AI.\n\n- Semantic Search\n- AI Document Q&A\n- Multi-PDF RAG Workspace",
     },
   ]);
 
@@ -21,8 +26,110 @@ export default function Home() {
 
   const [chatMode, setChatMode] = useState("pdf");
 
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  // -----------------------------------------
+  // DRAG & DROP PDF
+  // -----------------------------------------
+  const onDrop = async (
+    acceptedFiles: File[]
+  ) => {
+
+    const file = acceptedFiles[0];
+
+    if (!file) return;
+
+    const formData = new FormData();
+
+    formData.append("file", file);
+
+    setUploading(true);
+
+    try {
+
+      const response = await axios.post(
+        "http://127.0.0.1:8000/upload-pdf",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      // Save uploaded file
+      setUploadedFiles((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          chunks: response.data.chunks,
+        },
+      ]);
+
+      // Add chat card
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          type: "file",
+          fileName: file.name,
+          chunks: response.data.chunks,
+          content: "PDF uploaded successfully.",
+        },
+      ]);
+
+    } catch {
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "PDF upload failed.",
+        },
+      ]);
+
+    }
+
+    setUploading(false);
+
+  };
+
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+  } = useDropzone({
+    onDrop,
+    accept: {
+      "application/pdf": [".pdf"],
+    },
+    multiple: false,
+  });
+
+  // -----------------------------------------
+  // COPY BUTTON
+  // -----------------------------------------
+  const copyToClipboard = async (
+    text: string
+  ) => {
+
+    try {
+
+      await navigator.clipboard.writeText(text);
+
+    } catch (error) {
+
+      console.error("Copy failed", error);
+
+    }
+
+  };
+
+  // -----------------------------------------
+  // AUTO SCROLL
+  // -----------------------------------------
   useEffect(() => {
 
     messagesEndRef.current?.scrollIntoView({
@@ -31,7 +138,9 @@ export default function Home() {
 
   }, [messages, loading]);
 
-  // Normal Chat
+  // -----------------------------------------
+  // NORMAL CHAT
+  // -----------------------------------------
   const sendMessage = async () => {
 
     if (!message.trim() || loading) return;
@@ -60,7 +169,9 @@ export default function Home() {
 
       const aiMessage = {
         role: "assistant",
-        content: response.data.response,
+        content:
+          response.data.response ||
+          "No response generated.",
       };
 
       setMessages((prev) => [...prev, aiMessage]);
@@ -80,7 +191,9 @@ export default function Home() {
     setLoading(false);
   };
 
-  // Upload PDF
+  // -----------------------------------------
+  // MANUAL PDF UPLOAD
+  // -----------------------------------------
   const uploadPDF = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -107,6 +220,16 @@ export default function Home() {
         }
       );
 
+      // Save uploaded file
+      setUploadedFiles((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          chunks: response.data.chunks,
+        },
+      ]);
+
+      // Chat message
       setMessages((prev) => [
         ...prev,
         {
@@ -133,7 +256,9 @@ export default function Home() {
     setUploading(false);
   };
 
-  // Ask PDF
+  // -----------------------------------------
+  // ASK PDF
+  // -----------------------------------------
   const askPDF = async () => {
 
     if (!message.trim() || loading) return;
@@ -163,10 +288,10 @@ export default function Home() {
       const aiMessage = {
         role: "assistant",
         content:
-    response.data.response ||
-    "No response generated.",
-  sources:
-    response.data.sources || [],
+          response.data.response ||
+          "No response generated.",
+        sources:
+          response.data.sources || [],
       };
 
       setMessages((prev) => [...prev, aiMessage]);
@@ -190,11 +315,12 @@ export default function Home() {
     <main className="flex h-screen bg-[#0A0A0A] text-white overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="w-72 border-r border-[#1A1A1A] bg-[#0D0D0D] flex flex-col">
+      <aside className="w-80 border-r border-[#1A1A1A] bg-[#0D0D0D] flex flex-col">
 
+        {/* Logo */}
         <div className="p-6 border-b border-[#1A1A1A]">
 
-          <h1 className="text-3xl font-semibold">
+          <h1 className="text-3xl font-semibold tracking-tight">
             MinAI
           </h1>
 
@@ -204,37 +330,107 @@ export default function Home() {
 
         </div>
 
-        {/* Upload */}
+        {/* Drag Upload */}
         <div className="p-4 space-y-3">
 
-          <label className="block cursor-pointer">
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all ${
+              isDragActive
+                ? "border-white bg-[#151515]"
+                : "border-[#2A2A2A] bg-[#111111] hover:bg-[#171717]"
+            }`}
+          >
 
-            <input
-              type="file"
-              accept=".pdf"
-              className="hidden"
-              onChange={uploadPDF}
-            />
+            <input {...getInputProps()} />
 
-            <div className="w-full bg-[#1A1A1A] hover:bg-[#222222] border border-[#2A2A2A] rounded-2xl py-3 text-sm font-medium text-center transition-all">
+            <div className="space-y-3">
 
-              {uploading
-                ? "Uploading PDF..."
-                : "Upload PDF"}
+              <div className="text-4xl">
+                📄
+              </div>
+
+              <div>
+
+                <p className="text-sm font-medium">
+
+                  {uploading
+                    ? "Uploading PDF..."
+                    : isDragActive
+                    ? "Drop PDF here"
+                    : "Drag & Drop PDF"}
+
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  or click to browse
+                </p>
+
+              </div>
 
             </div>
 
-          </label>
+          </div>
+
+        </div>
+
+        {/* Uploaded Documents */}
+        <div className="px-4 space-y-3">
+
+          <div className="text-xs uppercase tracking-wide text-gray-500 px-1">
+            Documents
+          </div>
+
+          {uploadedFiles.length === 0 ? (
+
+            <div className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4 text-xs text-gray-500">
+              No PDFs uploaded yet
+            </div>
+
+          ) : (
+
+            uploadedFiles.map((file, index) => (
+
+              <div
+                key={index}
+                className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4"
+              >
+
+                <div className="flex items-start gap-3">
+
+                  <div className="text-xl">
+                    📄
+                  </div>
+
+                  <div className="min-w-0">
+
+                    <p className="text-sm font-medium truncate">
+                      {file.name}
+                    </p>
+
+                    <p className="text-xs text-gray-500 mt-1">
+                      {file.chunks} chunks indexed
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            ))
+
+          )}
 
         </div>
 
         {/* Sidebar Cards */}
-        <div className="flex-1 overflow-y-auto px-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
 
           <div className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4">
 
             <h3 className="font-medium text-sm">
-              PDF RAG System
+              Multi-PDF RAG
             </h3>
 
             <p className="text-xs text-gray-500 mt-2">
@@ -250,13 +446,14 @@ export default function Home() {
             </h3>
 
             <p className="text-xs text-gray-500 mt-2">
-              Chat with uploaded files
+              Chat with multiple documents
             </p>
 
           </div>
 
         </div>
 
+        {/* Footer */}
         <div className="p-4 border-t border-[#1A1A1A] text-xs text-gray-600">
           MinAI v1.0
         </div>
@@ -274,7 +471,7 @@ export default function Home() {
           </h2>
 
           <div className="text-xs text-gray-600">
-            RAG Enabled
+            Multi-Document RAG Enabled
           </div>
 
         </div>
@@ -286,7 +483,7 @@ export default function Home() {
 
             <div
               key={index}
-              className={`max-w-3xl ${
+              className={`max-w-4xl ${
                 msg.role === "user"
                   ? "ml-auto"
                   : ""
@@ -301,6 +498,7 @@ export default function Home() {
                 }`}
               >
 
+                {/* File Card */}
                 {msg.type === "file" ? (
 
                   <div className="flex items-center gap-4">
@@ -325,26 +523,58 @@ export default function Home() {
 
                 ) : (
 
-                  <div>
+                  <div className="space-y-4">
 
-                    <p className="leading-8 whitespace-pre-wrap text-[15px]">
-                      {msg.content || "No response available."}
-                    </p>
+                    {/* Assistant Header */}
+                    {msg.role === "assistant" && (
 
+                      <div className="flex items-center justify-between">
+
+                        <div className="text-xs text-gray-500">
+                          MinAI Response
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            copyToClipboard(msg.content)
+                          }
+                          className="text-xs bg-[#1A1A1A] hover:bg-[#222222] border border-[#2A2A2A] px-3 py-1 rounded-xl transition-all"
+                        >
+                          Copy
+                        </button>
+
+                      </div>
+
+                    )}
+
+                    {/* Markdown */}
+                    <div className="prose prose-invert max-w-none prose-pre:bg-[#1A1A1A] prose-pre:border prose-pre:border-[#2A2A2A] prose-pre:rounded-2xl prose-code:text-gray-200">
+
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                      >
+                        {msg.content || "No response available."}
+                      </ReactMarkdown>
+
+                    </div>
+
+                    {/* Sources */}
                     {msg.sources && msg.sources.length > 0 && (
 
                       <div className="mt-5 flex flex-wrap gap-2">
 
-                        {msg.sources.map((source: string, i: number) => (
+                        {msg.sources.map(
+                          (source: string, i: number) => (
 
-                          <div
-                            key={i}
-                            className="bg-[#1A1A1A] border border-[#2A2A2A] px-3 py-1 rounded-xl text-xs text-gray-300"
-                          >
-                            {source}
-                          </div>
+                            <div
+                              key={i}
+                              className="bg-[#1A1A1A] border border-[#2A2A2A] px-3 py-1 rounded-xl text-xs text-gray-300"
+                            >
+                              {source}
+                            </div>
 
-                        ))}
+                          )
+                        )}
 
                       </div>
 
@@ -360,15 +590,36 @@ export default function Home() {
 
           ))}
 
+          {/* Loading */}
           {loading && (
 
-            <div className="max-w-3xl">
+            <div className="max-w-3xl animate-in fade-in duration-300">
 
               <div className="bg-[#111111] border border-[#1F1F1F] rounded-3xl px-6 py-5">
 
-                <p className="text-gray-400 animate-pulse">
-                  MinAI is analyzing your request...
-                </p>
+                <div className="flex items-center gap-3">
+
+                  <div className="flex gap-1">
+
+                    <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></div>
+
+                    <div
+                      className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                      style={{ animationDelay: "0.15s" }}
+                    ></div>
+
+                    <div
+                      className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                      style={{ animationDelay: "0.3s" }}
+                    ></div>
+
+                  </div>
+
+                  <p className="text-gray-400 text-sm">
+                    MinAI is thinking...
+                  </p>
+
+                </div>
 
               </div>
 
@@ -380,7 +631,7 @@ export default function Home() {
 
         </div>
 
-        {/* Chat Mode Toggle */}
+        {/* Mode Toggle */}
         <div className="px-8 pb-4 flex gap-3">
 
           <button
@@ -439,11 +690,13 @@ export default function Home() {
 
             <button
               onClick={() => {
+
                 if (chatMode === "pdf") {
                   askPDF();
                 } else {
                   sendMessage();
                 }
+
               }}
               disabled={loading}
               className="bg-[#F5F5F5] text-black hover:opacity-90 transition-all px-8 py-4 rounded-3xl font-medium disabled:opacity-50"
