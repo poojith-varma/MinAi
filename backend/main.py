@@ -41,6 +41,7 @@ client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 all_chunks = []
+vectorstore = None
 
 last_pdf_topic = ""
 
@@ -220,19 +221,26 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         for doc in docs:
 
+          doc.metadata["source"] = file.filename
+
+        for doc in docs:
+
           all_chunks.append(doc.page_content)
 
         print(f"CHUNKS CREATED: {len(docs)}")
 
-        # Create vector DB
-        print("CREATING VECTOR STORE...")
+                # Create vector DB
+        global vectorstore
 
-        vectorstore = Chroma(
-            persist_directory="chroma_db",
-            embedding_function=embedding_model
-        )
+        if vectorstore is None:
 
-        # Add docs
+            print("CREATING VECTOR STORE...")
+
+            vectorstore = Chroma(
+                persist_directory="chroma_db",
+                embedding_function=embedding_model
+            )
+
         print("ADDING DOCUMENTS TO CHROMA...")
 
         vectorstore.add_documents(docs)
@@ -351,10 +359,14 @@ async def generate_quiz():
 
         print("\n========== GENERATING QUIZ ==========")
 
-        vectorstore = Chroma(
-            persist_directory="chroma_db",
-            embedding_function=embedding_model
-        )
+        global vectorstore
+
+        if vectorstore is None:
+
+            vectorstore = Chroma(
+                persist_directory="chroma_db",
+                embedding_function=embedding_model
+            )
 
         docs = vectorstore.similarity_search(
             "important concepts topics quiz questions",
@@ -471,10 +483,14 @@ async def generate_flashcards():
 
         print("\n========== GENERATING FLASHCARDS ==========")
 
-        vectorstore = Chroma(
-            persist_directory="chroma_db",
-            embedding_function=embedding_model
-        )
+        global vectorstore
+
+        if vectorstore is None:
+
+            vectorstore = Chroma(
+                persist_directory="chroma_db",
+                embedding_function=embedding_model
+            )
 
         docs = vectorstore.similarity_search(
             "important concepts definitions flashcards",
@@ -586,10 +602,14 @@ async def generate_summary():
         print("\n========== GENERATING SUMMARY ==========")
 
         # Load Vector DB
-        vectorstore = Chroma(
-            persist_directory="chroma_db",
-            embedding_function=embedding_model
-        )
+        global vectorstore
+ 
+        if vectorstore is None:
+
+            vectorstore = Chroma(
+                persist_directory="chroma_db",
+                embedding_function=embedding_model
+            )
 
         # Retrieve larger context
         docs = vectorstore.similarity_search(
@@ -779,8 +799,14 @@ async def ask_pdf(req: ChatRequest):
             if page != "Unknown":
 
                 page = page + 1
+            pdf_name = doc.metadata.get(
+                "source",
+                "Unknown PDF"
+            )
 
-            sources.append(f"Page {page}")
+            sources.append(
+                f"{pdf_name} - Page {page}"
+            )
 
         # -----------------------------------------
         # BM25 RESULTS
