@@ -1,12 +1,12 @@
-# 🚀 MinAI — AI Powered Multi-PDF Learning Workspace
+# 🚀 MinAI — AI Powered Multi-PDF RAG Learning Workspace
 
 <div align="center">
 
 # 🧠 MinAI
 
-### *Your Personal AI Study Companion*
+### *Your Personal AI Study Companion powered by RAG + LLMs*
 
-Upload PDFs 📄 • Chat with Documents 💬 • Generate Notes 📝 • Create Flashcards 🧠 • Take AI Quizzes 🎯
+Upload PDFs 📄 • Chat with Documents 💬 • Generate Notes 📝 • Flashcards 🧠 • AI Quizzes 🎯 • Multi-PDF Reasoning 🚀
 
 ---
 
@@ -23,61 +23,172 @@ Upload PDFs 📄 • Chat with Documents 💬 • Generate Notes 📝 • Create
 
 # 🌟 What is MinAI?
 
-MinAI is an **AI-powered educational workspace** built to solve one major problem:
+MinAI is an AI-powered Multi-PDF RAG Learning Workspace designed to transform static PDFs into intelligent learning systems.
 
-> Students waste too much time reading huge PDFs, notes, textbooks, and scattered study material manually.
+It combines:
+- Retrieval-Augmented Generation (RAG)
+- Hybrid Retrieval
+- Semantic Search
+- Conversational AI
+- AI Study Tools
 
-MinAI transforms traditional studying into an **interactive AI learning experience**.
-
-Instead of endlessly scrolling through PDFs:
-
-✅ Upload your study materials  
-✅ Ask questions naturally  
-✅ Generate summaries instantly  
-✅ Create quizzes automatically  
-✅ Learn using flashcards  
-✅ Export beautiful study notes  
-✅ Study across multiple PDFs at once
+to create a powerful educational assistant.
 
 ---
 
 # ❓ Why We Built MinAI
 
-Most AI chatbots:
+Traditional studying is slow, repetitive, and inefficient.
 
-❌ Use outside knowledge  
-❌ Hallucinate answers  
-❌ Ignore uploaded study material  
-❌ Aren’t optimized for students  
-❌ Don’t support structured learning
+Students spend hours:
+- searching PDFs manually
+- creating notes
+- making flashcards
+- revising huge documents
 
-We wanted to build something that:
+Most AI chatbots also hallucinate and generate inaccurate educational content.
 
-🎯 Answers ONLY from uploaded documents  
-🎯 Works like a real AI study assistant  
-🎯 Helps students revise faster  
-🎯 Makes exam preparation interactive  
-🎯 Converts boring PDFs into smart learning systems
+MinAI solves this problem using:
+# Grounded Retrieval-Augmented Generation (RAG)
 
-MinAI was created as a **student-focused AI SaaS platform** combining:
-
-- RAG (Retrieval-Augmented Generation)
-- Semantic Search
-- Hybrid Retrieval
-- AI Learning Tools
-- Modern Full Stack Architecture
+This ensures:
+✅ responses ONLY from uploaded PDFs  
+✅ reduced hallucinations  
+✅ context-aware learning  
+✅ source-based educational explanations  
 
 ---
 
-# ✨ Core Features
+# 🚀 Core Features
 
-# 📄 AI PDF Chat
+✅ Multi-PDF AI Chat  
+✅ Retrieval-Augmented Generation (RAG)  
+✅ Hybrid Search (Semantic + BM25)  
+✅ AI Flashcards  
+✅ AI Quiz Generator  
+✅ AI Summary Generator  
+✅ Follow-Up Memory  
+✅ Source Citations  
+✅ Professional PDF Export  
+✅ Multi-Document Workspace  
 
-Chat naturally with uploaded PDFs.
+---
 
-Example:
+# 📚 Documentation
 
-```text
-What is Linear Discriminant Analysis?
-Explain Unit IV.
-Compare clustering and classification.
+| Section | Description |
+|---|---|
+| [✨ Features](./docs/FEATURES.md) | Complete feature documentation |
+| [🧠 RAG Model](./docs/RAG_MODEL.md) | Detailed RAG pipeline and retrieval system |
+| [🤖 Sources & Models](./docs/SOURCES_AND_MODELS.md) | LLMs, embeddings, APIs, frameworks |
+| [🖼️ Screenshots](./docs/SCREENSHOTS.md) | Application screenshots |
+| [🏗️ Workflow & Architecture](./docs/ARCHITECTURE.md) | System architecture and workflow |
+
+---
+
+# 🛠️ Tech Stack
+
+## Frontend
+- Next.js
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+
+## Backend
+- FastAPI
+- Python
+- LangChain
+- ChromaDB
+
+## AI Stack
+- Groq API
+- Llama 3.3 70B
+- Llama 3 8B
+- HuggingFace Embeddings
+
+---
+
+# ⚙️ Installation
+
+## 1️⃣ Clone Repository
+
+```bash
+git clone YOUR_REPOSITORY_URL
+```
+
+---
+
+## 2️⃣ Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 3️⃣ Backend Setup
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+---
+
+# 🔑 Environment Variables
+
+Create `.env` inside backend:
+
+```env
+GROQ_API_KEY=your_groq_api_key
+```
+
+---
+
+# 📂 Project Structure
+
+```bash
+minai/
+│
+├── frontend/
+├── backend/
+├── docs/
+└── README.md
+```
+
+---
+
+# 👨‍💻 Author
+
+## Poojith
+
+Built with ❤️ using:
+- Next.js
+- FastAPI
+- LangChain
+- ChromaDB
+- Groq
+- HuggingFace
+
+---
+
+# ⭐ Support
+
+If you liked this project:
+
+⭐ Star the repository  
+🍴 Fork the project  
+🚀 Share feedback  
+
+---
+
+<div align="center">
+
+# 🚀 MinAI
+
+### *Transforming PDFs into Intelligent AI Learning Systems*
+
+</div>
