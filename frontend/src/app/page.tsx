@@ -8,6 +8,8 @@ import remarkGfm from "remark-gfm";
 
 import { useDropzone } from "react-dropzone";
 
+const BACKEND_URL = "http://127.0.0.1:8000";
+
 export default function Home() {
 
   const [message, setMessage] = useState("");
@@ -50,7 +52,7 @@ export default function Home() {
     try {
 
       const response = await axios.post(
-        "http://127.0.0.1:8000/upload-pdf",
+        `${BACKEND_URL}/upload-pdf`,
         formData,
         {
           headers: {
@@ -200,7 +202,7 @@ useEffect(() => {
     try {
 
       const response = await axios.post(
-        "http://127.0.0.1:8000/chat",
+        `${BACKEND_URL}/chat`,
         {
           message: currentMessage,
         }
@@ -318,7 +320,7 @@ useEffect(() => {
     try {
 
       const response = await axios.post(
-        "http://127.0.0.1:8000/ask-pdf",
+        `${BACKEND_URL}/ask-pdf`,
         {
           message: currentMessage,
         }
@@ -381,7 +383,11 @@ useEffect(() => {
             }`}
           >
 
-            <input {...getInputProps()} />
+            <input
+  {...getInputProps()}
+  id="pdf-upload"
+  name="pdf-upload"
+/>
 
             <div className="space-y-3">
 

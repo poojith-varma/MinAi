@@ -5,29 +5,26 @@ from groq import Groq
 from dotenv import load_dotenv
 import os
 
+from rank_bm25 import BM25Okapi
+
 # LangChain Imports
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
-# Load Environment Variables
+# -----------------------------------------
+# LOAD ENV
+# -----------------------------------------
 load_dotenv()
 
-# FastAPI App
+# -----------------------------------------
+# FASTAPI
+# -----------------------------------------
 app = FastAPI()
 
 # -----------------------------------------
-# LIGHTWEIGHT EMBEDDING LOADER
-# -----------------------------------------
-def get_embedding_model():
-
-    return HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
-# -----------------------------------------
-# ENABLE CORS
+# CORS
 # -----------------------------------------
 app.add_middleware(
     CORSMiddleware,
@@ -43,12 +40,25 @@ app.add_middleware(
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
+all_chunks = []
 
 # -----------------------------------------
 # REQUEST MODEL
 # -----------------------------------------
 class ChatRequest(BaseModel):
     message: str
+
+# -----------------------------------------
+# LOAD EMBEDDING MODEL ON STARTUP
+# -----------------------------------------
+print("\nLoading embedding model...")
+print("First startup may take a few minutes...\n")
+
+embedding_model = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+print("\nEmbedding model loaded successfully.\n")
 
 # -----------------------------------------
 # ROOT ROUTE
@@ -61,7 +71,7 @@ async def root():
     }
 
 # -----------------------------------------
-# AI RESPONSE GENERATOR
+# MODEL FALLBACK FUNCTION
 # -----------------------------------------
 def generate_ai_response(messages):
 
@@ -170,38 +180,64 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     try:
 
+        print("\n========== PDF UPLOAD STARTED ==========")
+
+        # Create uploads folder
         os.makedirs("uploads", exist_ok=True)
 
         file_path = f"uploads/{file.filename}"
 
+        # Save file
         with open(file_path, "wb") as f:
-            f.write(await file.read())
+
+            content = await file.read()
+
+            f.write(content)
+
+        print("PDF SAVED")
 
         # Load PDF
+        print("LOADING PDF...")
+
         loader = PyPDFLoader(file_path)
 
         documents = loader.load()
 
-        # Split Documents
+        print(f"PDF LOADED | Pages: {len(documents)}")
+
+        # Split into chunks
+        print("SPLITTING DOCUMENTS...")
+
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=1200,
             chunk_overlap=200
         )
 
         docs = splitter.split_documents(documents)
+        global all_chunks
 
-        # Create Vector DB
+        for doc in docs:
+
+          all_chunks.append(doc.page_content)
+
+        print(f"CHUNKS CREATED: {len(docs)}")
+
+        # Create vector DB
+        print("CREATING VECTOR STORE...")
+
         vectorstore = Chroma(
             persist_directory="chroma_db",
-            embedding_function=get_embedding_model()
+            embedding_function=embedding_model
         )
 
-        # Add Documents
+        # Add docs
+        print("ADDING DOCUMENTS TO CHROMA...")
+
         vectorstore.add_documents(docs)
 
-        print("\n========== PDF INDEXED ==========")
+        print("\n========== PDF INDEXED SUCCESSFULLY ==========")
         print(f"Chunks Created: {len(docs)}")
-        print("=================================\n")
+        print("==============================================\n")
 
         return {
             "message": "PDF uploaded successfully",
@@ -222,73 +258,208 @@ async def upload_pdf(file: UploadFile = File(...)):
 # -----------------------------------------
 # PDF RAG CHAT
 # -----------------------------------------
+
+def bm25_search(query, top_k=3):
+
+    global all_chunks
+
+    if len(all_chunks) == 0:
+
+        return []
+
+    tokenized_chunks = [
+        chunk.lower().split()
+        for chunk in all_chunks
+    ]
+
+    bm25 = BM25Okapi(tokenized_chunks)
+
+    tokenized_query = query.lower().split()
+
+    scores = bm25.get_scores(tokenized_query)
+
+    ranked_indices = sorted(
+        range(len(scores)),
+        key=lambda i: scores[i],
+        reverse=True
+    )
+
+    results = []
+
+    for idx in ranked_indices[:top_k]:
+
+        results.append(all_chunks[idx])
+
+    return results
+
 @app.post("/ask-pdf")
 async def ask_pdf(req: ChatRequest):
 
     try:
 
-        # Load Existing Vector DB
+        print("\n========== PDF QUESTION ==========")
+        print(req.message)
+
+        # -----------------------------------------
+        # LOAD VECTOR DB
+        # -----------------------------------------
+
         vectorstore = Chroma(
             persist_directory="chroma_db",
-            embedding_function=get_embedding_model()
+            embedding_function=embedding_model
         )
 
-        # Semantic Search
-        docs = vectorstore.similarity_search(
-            req.message,
-            k=3
+        normalized_query = req.message.lower().strip()
+
+        # -----------------------------------------
+        # SEMANTIC SEARCH
+        # -----------------------------------------
+
+        docs_with_scores = vectorstore.similarity_search_with_score(
+            normalized_query,
+            k=6
+        )
+
+        # -----------------------------------------
+        # BM25 SEARCH
+        # -----------------------------------------
+
+        bm25_results = bm25_search(
+            normalized_query,
+            top_k=6
+        )
+
+        print(
+            f"RETRIEVED CHUNKS: {len(docs_with_scores)}"
         )
 
         context_parts = []
 
+        seen_chunks = set()
+
         sources = []
 
-        for doc in docs:
+        # -----------------------------------------
+        # VECTOR RESULTS
+        # -----------------------------------------
+
+        for doc, score in docs_with_scores:
 
             text = doc.page_content.strip()
 
-            if len(text) > 40:
-                context_parts.append(text)
+            # Ignore weak semantic matches
+            if score > 1.6:
+                continue
 
-            page = doc.metadata.get("page", "Unknown")
+            # Ignore tiny/noisy chunks
+            if len(text) < 80:
+                continue
+
+            cleaned_text = " ".join(
+                text.split()
+            )
+
+            if cleaned_text not in seen_chunks:
+
+                context_parts.append(cleaned_text)
+
+                seen_chunks.add(cleaned_text)
+
+            page = doc.metadata.get(
+                "page",
+                "Unknown"
+            )
 
             if page != "Unknown":
+
                 page = page + 1
 
             sources.append(f"Page {page}")
 
-        # Remove duplicates
-        sources = list(set(sources))
+        # -----------------------------------------
+        # BM25 RESULTS
+        # -----------------------------------------
+
+        for text in bm25_results:
+
+            cleaned = " ".join(
+                text.strip().split()
+            )
+
+            # Ignore tiny chunks
+            if len(cleaned) < 80:
+                continue
+
+            # Ignore duplicate chunks
+            if cleaned in seen_chunks:
+                continue
+
+            # Lightweight relevance filtering
+            query_words = set(
+                normalized_query.split()
+            )
+
+            chunk_words = set(
+                cleaned.lower().split()
+            )
+
+            overlap = len(
+                query_words.intersection(
+                    chunk_words
+                )
+            )
+
+            # Skip irrelevant keyword matches
+            if overlap == 0:
+                continue
+
+            context_parts.append(cleaned)
+
+            seen_chunks.add(cleaned)
+
+        # -----------------------------------------
+        # FINAL CONTEXT
+        # -----------------------------------------
 
         context = "\n\n".join(context_parts)
 
         print("\n========== RETRIEVED CONTEXT ==========")
-        print(context[:1200])
+        print(context[:1500])
         print("=======================================\n")
 
-        # No Context
-        if context.strip() == "":
+        # -----------------------------------------
+        # STRICT GROUNDING CHECK
+        # -----------------------------------------
+
+        if len(context_parts) == 0:
 
             return {
-                "response": """
-I could not find relevant information in the uploaded PDF.
-""",
+                "response":
+                "The requested information is not present in the uploaded document.",
                 "sources": []
             }
 
-        # AI Prompt
+        # -----------------------------------------
+        # AI PROMPT
+        # -----------------------------------------
+
         messages = [
             {
                 "role": "system",
                 "content": """
-You are MinAI, an intelligent educational AI assistant.
+You are MinAI, a strict educational document assistant.
 
-Rules:
-- ALWAYS answer in English
-- Explain concepts clearly
-- Be concise but informative
-- Use simple educational language
-- Answer using the provided document context
+CRITICAL RULES:
+- Answer ONLY from the provided document context
+- NEVER use outside knowledge
+- NEVER hallucinate
+- NEVER guess
+- If the answer is not clearly found in the context, respond EXACTLY with:
+
+"The requested information is not present in the uploaded document."
+
+- Keep answers concise, educational, and accurate
+- Always respond in English
 """
             },
             {
@@ -300,28 +471,32 @@ Question:
 Document Context:
 {context}
 
-Answer:
+Answer ONLY using the document context.
 """
             }
         ]
 
-        # Generate AI Response
-        response_text = generate_ai_response(messages)
+        # -----------------------------------------
+        # GENERATE RESPONSE
+        # -----------------------------------------
 
-        # Fallback
+        response_text = generate_ai_response(
+            messages
+        )
+
+        # -----------------------------------------
+        # FALLBACK
+        # -----------------------------------------
+
         if (
             response_text is None
             or response_text.strip() == ""
         ):
 
-            response_text = f"""
-I found relevant information in the document but the AI models are currently busy.
-
-Relevant Sources:
-{", ".join(sources)}
-
-Please try again in a few seconds.
-"""
+            response_text = (
+                "The AI model could not generate "
+                "a grounded answer from the document."
+            )
 
         print("\n========== FINAL RESPONSE ==========")
         print(response_text)
@@ -329,7 +504,7 @@ Please try again in a few seconds.
 
         return {
             "response": response_text,
-            "sources": sources
+            "sources": list(set(sources))
         }
 
     except Exception as e:
