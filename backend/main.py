@@ -339,9 +339,244 @@ def rewrite_followup_query(query):
 
     return query
 
+
 # -----------------------------------------
-# PDF SUMMARY GENERATION
+# QUIZ GENERATION
 # -----------------------------------------
+
+@app.post("/generate-quiz")
+async def generate_quiz():
+
+    try:
+
+        print("\n========== GENERATING QUIZ ==========")
+
+        vectorstore = Chroma(
+            persist_directory="chroma_db",
+            embedding_function=embedding_model
+        )
+
+        docs = vectorstore.similarity_search(
+            "important concepts topics quiz questions",
+            k=12
+        )
+
+        context_parts = []
+
+        seen = set()
+
+        for doc in docs:
+
+            text = " ".join(
+                doc.page_content.split()
+            )
+
+            if (
+                len(text) > 80
+                and text not in seen
+            ):
+
+                context_parts.append(text)
+
+                seen.add(text)
+
+        context = "\n\n".join(context_parts)
+
+        if context.strip() == "":
+
+            return {
+                "quiz":
+                "No PDF content found."
+            }
+
+        messages = [
+            {
+                "role": "system",
+                "content": """
+You are MinAI, an AI educational assistant.
+
+Generate:
+- 5 multiple choice questions
+- 4 options per question
+- correct answer
+- short explanation
+
+ONLY using the provided document context.
+
+Format clearly using markdown.
+
+Example:
+
+## Question 1
+What is ...?
+
+A) ...
+B) ...
+C) ...
+D) ...
+
+**Answer:** B
+
+**Explanation:** ...
+"""
+            },
+            {
+                "role": "user",
+                "content": f"""
+Document Context:
+{context}
+
+Generate a quiz from the document.
+"""
+            }
+        ]
+
+        response_text = generate_ai_response(
+            messages
+        )
+
+        if (
+            response_text is None
+            or response_text.strip() == ""
+        ):
+
+            response_text = (
+                "Could not generate quiz."
+            )
+
+        print("\n========== QUIZ GENERATED ==========")
+
+        return {
+            "quiz": response_text
+        }
+
+    except Exception as e:
+
+        print("\n========== QUIZ ERROR ==========")
+        print(str(e))
+        print("==================================\n")
+
+        return {
+            "error": str(e)
+        }
+
+# -----------------------------------------
+# FLASHCARD GENERATION
+# -----------------------------------------
+
+@app.post("/generate-flashcards")
+async def generate_flashcards():
+
+    try:
+
+        print("\n========== GENERATING FLASHCARDS ==========")
+
+        vectorstore = Chroma(
+            persist_directory="chroma_db",
+            embedding_function=embedding_model
+        )
+
+        docs = vectorstore.similarity_search(
+            "important concepts definitions flashcards",
+            k=12
+        )
+
+        context_parts = []
+
+        seen = set()
+
+        for doc in docs:
+
+            text = " ".join(
+                doc.page_content.split()
+            )
+
+            if (
+                len(text) > 80
+                and text not in seen
+            ):
+
+                context_parts.append(text)
+
+                seen.add(text)
+
+        context = "\n\n".join(context_parts)
+
+        if context.strip() == "":
+
+            return {
+                "flashcards":
+                "No PDF content found."
+            }
+
+        messages = [
+            {
+                "role": "system",
+                "content": """
+You are MinAI, an AI educational assistant.
+
+Generate:
+- concise study flashcards
+- question and answer pairs
+- important definitions
+- key concepts
+
+ONLY using the provided document context.
+
+Format using markdown.
+
+Example:
+
+## Flashcard 1
+Q: What is Machine Learning?
+
+A: Machine Learning is...
+
+## Flashcard 2
+Q: What is clustering?
+
+A: Clustering is...
+"""
+            },
+            {
+                "role": "user",
+                "content": f"""
+Document Context:
+{context}
+
+Generate flashcards from the document.
+"""
+            }
+        ]
+
+        response_text = generate_ai_response(
+            messages
+        )
+
+        if (
+            response_text is None
+            or response_text.strip() == ""
+        ):
+
+            response_text = (
+                "Could not generate flashcards."
+            )
+
+        print("\n========== FLASHCARDS GENERATED ==========")
+
+        return {
+            "flashcards": response_text
+        }
+
+    except Exception as e:
+
+        print("\n========== FLASHCARD ERROR ==========")
+        print(str(e))
+        print("========================================\n")
+
+        return {
+            "error": str(e)
+        }
 
 @app.post("/generate-summary")
 async def generate_summary():

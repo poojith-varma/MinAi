@@ -27,6 +27,12 @@ export default function Home() {
   const [summaryLoading, setSummaryLoading] =
   useState(false);
 
+  const [quizLoading, setQuizLoading] =
+  useState(false);
+
+  const [flashcardLoading, setFlashcardLoading] =
+  useState(false);
+
   const [uploading, setUploading] = useState(false);
 
   const [chatMode, setChatMode] = useState("pdf");
@@ -224,6 +230,92 @@ const generateSummary = async () => {
   } finally {
 
     setSummaryLoading(false);
+  }
+};
+
+const generateQuiz = async () => {
+
+  try {
+
+    setQuizLoading(true);
+
+    const response = await axios.post(
+      `${BACKEND_URL}/generate-quiz`
+    );
+
+    const quizMessage = {
+      role: "assistant",
+      content: response.data.quiz,
+      type: "quiz",
+    };
+
+    setMessages((prev: any) => [
+      ...prev,
+      quizMessage,
+    ]);
+
+  } catch (error) {
+
+    console.error(error);
+
+    const errorMessage = {
+      role: "assistant",
+      content:
+        "Failed to generate quiz.",
+      type: "quiz",
+    };
+
+    setMessages((prev: any) => [
+      ...prev,
+      errorMessage,
+    ]);
+
+  } finally {
+
+    setQuizLoading(false);
+  }
+};
+
+const generateFlashcards = async () => {
+
+  try {
+
+    setFlashcardLoading(true);
+
+    const response = await axios.post(
+      `${BACKEND_URL}/generate-flashcards`
+    );
+
+    const flashcardMessage = {
+      role: "assistant",
+      content: response.data.flashcards,
+      type: "flashcards",
+    };
+
+    setMessages((prev: any) => [
+      ...prev,
+      flashcardMessage,
+    ]);
+
+  } catch (error) {
+
+    console.error(error);
+
+    const errorMessage = {
+      role: "assistant",
+      content:
+        "Failed to generate flashcards.",
+      type: "flashcards",
+    };
+
+    setMessages((prev: any) => [
+      ...prev,
+      errorMessage,
+    ]);
+
+  } finally {
+
+    setFlashcardLoading(false);
   }
 };
 
@@ -592,6 +684,48 @@ const generateSummary = async () => {
   </button>
 
   <button
+    onClick={generateQuiz}
+    disabled={quizLoading}
+    className="
+      text-xs
+      bg-blue-600
+      hover:bg-blue-700
+      px-3
+      py-1
+      rounded-xl
+      transition-all
+      disabled:opacity-50
+    "
+  >
+    {
+      quizLoading
+        ? "Generating..."
+        : "Generate Quiz"
+    }
+  </button>
+
+  <button
+    onClick={generateFlashcards}
+    disabled={flashcardLoading}
+    className="
+      text-xs
+      bg-green-600
+      hover:bg-green-700
+      px-3
+      py-1
+      rounded-xl
+      transition-all
+      disabled:opacity-50
+    "
+  >
+    {
+      flashcardLoading
+        ? "Generating..."
+        : "Generate Flashcards"
+    }
+  </button>
+
+  <button
     onClick={() => {
 
       localStorage.removeItem("minai_messages");
@@ -617,7 +751,6 @@ const generateSummary = async () => {
   </button>
 
 </div>
-
         </div>
 
         {/* Messages */}
