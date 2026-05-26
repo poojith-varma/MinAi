@@ -42,6 +42,8 @@ client = Groq(
 )
 all_chunks = []
 
+last_pdf_topic = ""
+
 # -----------------------------------------
 # REQUEST MODEL
 # -----------------------------------------
@@ -292,6 +294,167 @@ def bm25_search(query, top_k=3):
 
     return results
 
+# -----------------------------------------
+# FOLLOW-UP QUERY REWRITING
+# -----------------------------------------
+
+def rewrite_followup_query(query):
+
+    global last_pdf_topic
+
+    query_lower = query.lower().strip()
+
+    followup_phrases = [
+        "explain it",
+        "explain about it",
+        "tell me more",
+        "describe it",
+        "what is it",
+        "elaborate",
+        "explain more",
+        "give more details",
+        "explain about this",
+        "describe this",
+        "more about this",
+        "what about this"
+    ]
+
+    for phrase in followup_phrases:
+
+        if phrase in query_lower:
+
+            if last_pdf_topic != "":
+
+                rewritten = (
+                    query
+                    + " regarding "
+                    + last_pdf_topic
+                )
+
+                print(
+                    f"REWRITTEN QUERY: {rewritten}"
+                )
+
+                return rewritten
+
+    return query
+
+# -----------------------------------------
+# PDF SUMMARY GENERATION
+# -----------------------------------------
+
+@app.post("/generate-summary")
+async def generate_summary():
+
+    try:
+
+        print("\n========== GENERATING SUMMARY ==========")
+
+        # Load Vector DB
+        vectorstore = Chroma(
+            persist_directory="chroma_db",
+            embedding_function=embedding_model
+        )
+
+        # Retrieve larger context
+        docs = vectorstore.similarity_search(
+            "important topics concepts summary",
+            k=12
+        )
+
+        context_parts = []
+
+        seen = set()
+
+        for doc in docs:
+
+            text = " ".join(
+                doc.page_content.split()
+            )
+
+            if (
+                len(text) > 80
+                and text not in seen
+            ):
+
+                context_parts.append(text)
+
+                seen.add(text)
+
+        context = "\n\n".join(context_parts)
+
+        if context.strip() == "":
+
+            return {
+                "summary":
+                "No PDF content found."
+            }
+
+        messages = [
+            {
+                "role": "system",
+                "content": """
+You are MinAI, an educational AI assistant.
+
+Generate:
+- concise study notes
+- key concepts
+- important topics
+- educational summary
+
+ONLY from the provided document context.
+
+Keep the summary:
+- well structured
+- student friendly
+- concise but informative
+"""
+            },
+            {
+                "role": "user",
+                "content": f"""
+Document Context:
+{context}
+
+Generate a clean educational summary.
+"""
+            }
+        ]
+
+        response_text = generate_ai_response(
+            messages
+        )
+
+        if (
+            response_text is None
+            or response_text.strip() == ""
+        ):
+
+            response_text = (
+                "Could not generate summary."
+            )
+
+        print("\n========== SUMMARY GENERATED ==========")
+
+        return {
+            "summary": response_text
+        }
+
+    except Exception as e:
+
+        print("\n========== SUMMARY ERROR ==========")
+        print(str(e))
+        print("=====================================\n")
+
+        return {
+            "error": str(e)
+        }
+
+
+# -----------------------------------------
+# PDF RAG CHAT
+# -----------------------------------------
+
 @app.post("/ask-pdf")
 async def ask_pdf(req: ChatRequest):
 
@@ -309,7 +472,15 @@ async def ask_pdf(req: ChatRequest):
             embedding_function=embedding_model
         )
 
-        normalized_query = req.message.lower().strip()
+        rewritten_query = rewrite_followup_query(
+            req.message
+        )
+
+        normalized_query = (
+            rewritten_query.lower().strip()
+        )
+
+        print(f"FINAL QUERY: {normalized_query}")
 
         # -----------------------------------------
         # SEMANTIC SEARCH
@@ -447,19 +618,25 @@ async def ask_pdf(req: ChatRequest):
             {
                 "role": "system",
                 "content": """
-You are MinAI, a strict educational document assistant.
+You are MinAI, an educational AI assistant specialized in answering questions ONLY from uploaded PDF documents.
 
-CRITICAL RULES:
-- Answer ONLY from the provided document context
+STRICT RULES:
+- Use ONLY the provided document context
 - NEVER use outside knowledge
-- NEVER hallucinate
-- NEVER guess
-- If the answer is not clearly found in the context, respond EXACTLY with:
+- NEVER invent facts not present in the context
+- If relevant information exists in the context, explain it clearly and educationally
+- You ARE allowed to summarize, paraphrase, simplify, and explain retrieved content
+- Do NOT refuse if the concept exists in the retrieved context
+- ONLY refuse when the retrieved context truly contains no relevant information
+
+If no relevant information exists, respond EXACTLY with:
 
 "The requested information is not present in the uploaded document."
 
-- Keep answers concise, educational, and accurate
-- Always respond in English
+Always:
+- answer in English
+- be educational
+- be concise but informative
 """
             },
             {
@@ -483,6 +660,40 @@ Answer ONLY using the document context.
         response_text = generate_ai_response(
             messages
         )
+
+        # -----------------------------------------
+        # STORE CONVERSATION MEMORY
+        # -----------------------------------------
+
+        global last_pdf_topic
+
+        if response_text is not None:
+
+            cleaned_response = (
+                response_text
+                .replace("\n", " ")
+                .strip()
+            )
+
+            if (
+                "not present in the uploaded document"
+                not in cleaned_response.lower()
+            ):
+
+                memory_candidate = cleaned_response
+
+                # Limit memory size
+                if len(memory_candidate) > 150:
+
+                    memory_candidate = (
+                        memory_candidate[:150]
+                    )
+
+                last_pdf_topic = memory_candidate
+
+                print(
+                    f"LAST PDF MEMORY: {last_pdf_topic}"
+                )
 
         # -----------------------------------------
         # FALLBACK

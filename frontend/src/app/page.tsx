@@ -24,6 +24,9 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
 
+  const [summaryLoading, setSummaryLoading] =
+  useState(false);
+
   const [uploading, setUploading] = useState(false);
 
   const [chatMode, setChatMode] = useState("pdf");
@@ -67,6 +70,7 @@ export default function Home() {
         {
           name: file.name,
           chunks: response.data.chunks,
+          url: URL.createObjectURL(file),
         },
       ]);
 
@@ -179,6 +183,50 @@ useEffect(() => {
   );
 
 }, [messages, loading, uploadedFiles]);
+
+const generateSummary = async () => {
+
+  try {
+
+    setSummaryLoading(true);
+
+    const response = await axios.post(
+      `${BACKEND_URL}/generate-summary`
+    );
+
+    const summaryMessage = {
+      role: "assistant",
+      content: response.data.summary,
+      type: "summary",
+    };
+
+    setMessages((prev: any) => [
+      ...prev,
+      summaryMessage,
+    ]);
+
+  } catch (error) {
+
+    console.error(error);
+
+    const errorMessage = {
+      role: "assistant",
+      content:
+        "Failed to generate summary.",
+      type: "summary",
+    };
+
+    setMessages((prev: any) => [
+      ...prev,
+      errorMessage,
+    ]);
+
+  } finally {
+
+    setSummaryLoading(false);
+  }
+};
+
   // -----------------------------------------
   // NORMAL CHAT
   // -----------------------------------------
@@ -267,6 +315,7 @@ useEffect(() => {
         {
           name: file.name,
           chunks: response.data.chunks,
+          url: URL.createObjectURL(file),
         },
       ]);
 
@@ -522,6 +571,27 @@ useEffect(() => {
   </div>
 
   <button
+    onClick={generateSummary}
+    disabled={summaryLoading}
+    className="
+      text-xs
+      bg-purple-600
+      hover:bg-purple-700
+      px-3
+      py-1
+      rounded-xl
+      transition-all
+      disabled:opacity-50
+    "
+  >
+    {
+      summaryLoading
+        ? "Generating..."
+        : "Generate Summary"
+    }
+  </button>
+
+  <button
     onClick={() => {
 
       localStorage.removeItem("minai_messages");
@@ -633,26 +703,66 @@ useEffect(() => {
                     </div>
 
                     {/* Sources */}
-                    {msg.sources && msg.sources.length > 0 && (
+{msg.sources && msg.sources.length > 0 && (
 
-                      <div className="mt-5 flex flex-wrap gap-2">
+  <div className="mt-5 flex flex-wrap gap-2">
 
-                        {msg.sources.map(
-                          (source: string, i: number) => (
+    {msg.sources.map(
+      (source: string, i: number) => {
 
-                            <div
-                              key={i}
-                              className="bg-[#1A1A1A] border border-[#2A2A2A] px-3 py-1 rounded-xl text-xs text-gray-300"
-                            >
-                              {source}
-                            </div>
+        // Extract page number
+        const match = source.match(/\d+/);
 
-                          )
-                        )}
+        const pageNumber = match
+          ? parseInt(match[0])
+          : 1;
 
-                      </div>
+        // First uploaded PDF
+        const pdfFile =
+          uploadedFiles.length > 0
+            ? uploadedFiles[0]
+            : null;
 
-                    )}
+        return (
+
+          <button
+            key={i}
+            onClick={() => {
+
+              if (pdfFile?.url) {
+
+                window.open(
+                  `${pdfFile.url}#page=${pageNumber}`,
+                  "_blank"
+                );
+
+              }
+
+            }}
+            className="
+              bg-[#1A1A1A]
+              border
+              border-[#2A2A2A]
+              px-3
+              py-1
+              rounded-xl
+              text-xs
+              text-gray-300
+              hover:bg-[#222222]
+              transition-all
+            "
+          >
+            📄 {source}
+          </button>
+
+        );
+
+      }
+    )}
+
+  </div>
+
+)}
 
                   </div>
 
