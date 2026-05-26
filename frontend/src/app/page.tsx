@@ -8,6 +8,12 @@ import remarkGfm from "remark-gfm";
 
 import { useDropzone } from "react-dropzone";
 
+import Flashcard from "@/components/Flashcard";
+
+import ExportNotes from "@/components/ExportNotes";
+
+import { useReactToPrint } from "react-to-print";
+
 const BACKEND_URL = "http://127.0.0.1:8000";
 
 export default function Home() {
@@ -40,6 +46,55 @@ export default function Home() {
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const exportRef =
+  useRef<HTMLDivElement>(null);
+
+  const handlePrint =
+  useReactToPrint({
+    contentRef: exportRef,
+
+    documentTitle:
+      "MinAI_Study_Notes",
+
+    pageStyle: `
+      @page {
+        size: auto;
+        margin: 20mm;
+      }
+
+      @media print {
+
+        html, body {
+          height: initial !important;
+          overflow: initial !important;
+          -webkit-print-color-adjust: exact;
+        }
+
+      }
+    `,
+  });
+
+const exportNotes = async () => {
+
+  setShowExport(true);
+
+  setTimeout(() => {
+
+    handlePrint();
+
+    setTimeout(() => {
+
+      setShowExport(false);
+
+    }, 1000);
+
+  }, 500);
+
+};
+
+const [showExport, setShowExport] =
+  useState(false);
 
   // -----------------------------------------
   // DRAG & DROP PDF
@@ -319,6 +374,8 @@ const generateFlashcards = async () => {
   }
 };
 
+
+
   // -----------------------------------------
   // NORMAL CHAT
   // -----------------------------------------
@@ -494,6 +551,30 @@ const generateFlashcards = async () => {
   };
 
   return (
+
+   <>
+
+     {/* Hidden Export Layout */}
+{showExport && (
+
+  <div
+    ref={exportRef}
+    className="
+      bg-white
+      text-black
+      p-0
+      m-0
+    "
+  >
+
+    <ExportNotes
+      messages={messages}
+    />
+
+  </div>
+
+)}
+
     <main className="flex flex-col md:flex-row h-screen bg-[#0A0A0A] text-white overflow-hidden">
 
       {/* Sidebar */}
@@ -506,7 +587,7 @@ const generateFlashcards = async () => {
             MinAI
           </h1>
 
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[#666666] mt-1">
             Intelligent AI Workspace
           </p>
 
@@ -548,7 +629,7 @@ const generateFlashcards = async () => {
 
                 </p>
 
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[#666666] mt-1">
                   or click to browse
                 </p>
 
@@ -563,13 +644,13 @@ const generateFlashcards = async () => {
         {/* Uploaded Documents */}
         <div className="px-4 space-y-3">
 
-          <div className="text-xs uppercase tracking-wide text-gray-500 px-1">
+          <div className="text-xs uppercase tracking-wide text-[#666666] px-1">
             Documents
           </div>
 
           {uploadedFiles.length === 0 ? (
 
-            <div className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4 text-xs text-gray-500">
+            <div className="bg-[#111111] border border-[#1F1F1F] rounded-2xl p-4 text-xs text-[#666666]">
               No PDFs uploaded yet
             </div>
 
@@ -594,7 +675,7 @@ const generateFlashcards = async () => {
                       {file.name}
                     </p>
 
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-[#666666] mt-1">
                       {file.chunks} chunks indexed
                     </p>
 
@@ -619,7 +700,7 @@ const generateFlashcards = async () => {
               Multi-PDF RAG
             </h3>
 
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-[#666666] mt-2">
               Semantic document intelligence
             </p>
 
@@ -631,7 +712,7 @@ const generateFlashcards = async () => {
               AI Workspace
             </h3>
 
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-[#666666] mt-2">
               Chat with multiple documents
             </p>
 
@@ -725,6 +806,23 @@ const generateFlashcards = async () => {
     }
   </button>
 
+
+  <button
+  onClick={exportNotes}
+  className="
+    text-xs
+    bg-orange-600
+    hover:bg-orange-700
+    px-3
+    py-1
+    rounded-xl
+    transition-all
+  "
+>
+  Export Notes
+</button>
+  
+
   <button
     onClick={() => {
 
@@ -754,7 +852,7 @@ const generateFlashcards = async () => {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
+<div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
 
           {messages.map((msg, index) => (
 
@@ -807,7 +905,7 @@ const generateFlashcards = async () => {
 
                       <div className="flex items-center justify-between">
 
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-[#666666]">
                           MinAI Response
                         </div>
 
@@ -827,11 +925,21 @@ const generateFlashcards = async () => {
                     {/* Markdown */}
                     <div className="prose prose-invert max-w-none prose-pre:bg-[#1A1A1A] prose-pre:border prose-pre:border-[#2A2A2A] prose-pre:rounded-2xl prose-code:text-gray-200">
 
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                      >
-                        {msg.content || "No response available."}
-                      </ReactMarkdown>
+                      {msg.type === "flashcards" ? (
+
+  <Flashcard
+    content={msg.content}
+  />
+
+) : (
+
+  <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+  >
+    {msg.content || "No response available."}
+  </ReactMarkdown>
+
+)}
 
                     </div>
 
@@ -1002,7 +1110,7 @@ const generateFlashcards = async () => {
                   ? "Ask questions about uploaded PDFs..."
                   : "Ask MinAI anything..."
               }
-              className="flex-1 bg-[#111111] border border-[#1F1F1F] focus:border-[#333333] rounded-3xl px-6 py-4 outline-none text-white placeholder:text-gray-500"
+              className="flex-1 bg-[#111111] border border-[#1F1F1F] focus:border-[#333333] rounded-3xl px-6 py-4 outline-none text-white placeholder:text-[#666666]"
             />
 
             <button
@@ -1029,5 +1137,6 @@ const generateFlashcards = async () => {
       </section>
 
     </main>
+    </>
   );
 }
